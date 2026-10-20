@@ -6,7 +6,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-APP_VERSION="2.0.0"
+APP_VERSION="2.1.0"
 START=date(2026,9,1); DEFAULT_BALANCE=20.71; DEFAULT_DEPOSIT=10.; DEFAULT_NEXT=date(2026,9,11); BASELINE_DEPOSIT=10.
 BLUE="#087CF2"; DEEP_BLUE="#053B98"; NAVY="#061A45"; RED="#E51B23"; ORANGE="#FF6A00"; YELLOW="#FFE600"; WHITE="#FFFFFF"
 @dataclass(frozen=True)
@@ -53,6 +53,67 @@ st.set_page_config(page_title="High-Yield Savings Project",page_icon="💰",layo
 st.markdown("""<style>:root{--b:#087CF2;--n:#061A45;--r:#E51B23;--o:#FF6A00;--y:#FFE600}.stApp{background:linear-gradient(180deg,#087CF2,#075dcc 22%,#061A45 72%,#04102d);color:white}.block-container{max-width:1380px;padding:.35rem .7rem 3rem}header,footer{visibility:hidden}.brand{font-family:Impact,Arial Black;font-size:clamp(2rem,5vw,4.1rem);line-height:.9;font-style:italic;color:white;text-shadow:3px 3px 0 #E51B23}.brand span{color:#FFE600}.hero{border:4px solid #FFE600;border-radius:20px;padding:5px;background:#061A45;box-shadow:0 8px 0 #E51B23}.hero img{width:100%;display:block;border-radius:13px}.live{background:linear-gradient(155deg,#053B98,#087CF2 48%,#061A45 49%);border:4px solid #FFE600;border-radius:20px;padding:15px;box-shadow:0 8px 0 #E51B23}.title{font-family:Impact,Arial Black;font-size:1.65rem}.yellow{color:#FFE600;font-weight:1000}.section{font-size:1.3rem;font-weight:1000;margin:.9rem 0 .35rem}.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin:10px 0}.card{background:#061A45;border:3px solid #087CF2;border-bottom:6px solid #FF6A00;border-radius:15px;padding:13px}.label{font-size:.72rem;font-weight:1000;color:#FFE600}.value{font-family:Impact,Arial Black;font-size:clamp(1.65rem,4vw,2.65rem);line-height:1;margin-top:4px}.sub{font-size:.75rem;font-weight:800;color:#dcecff;margin-top:5px}.panel{background:#061A45;border:3px solid #FF6A00;border-left:8px solid #FFE600;border-radius:15px;padding:15px;margin:10px 0}.big{font-family:Impact,Arial Black;font-size:clamp(2.4rem,6vw,4rem);text-shadow:3px 3px 0 #E51B23;line-height:1}.goalbar{height:22px;background:#061A45;border:2px solid white;border-radius:999px;overflow:hidden}.fill{height:100%;background:linear-gradient(90deg,#FFE600,#FF6A00,#E51B23)}.copy{font-weight:900;margin-top:5px}.stButton button,.stFormSubmitButton button{width:100%;min-height:58px;background:linear-gradient(145deg,#E51B23,#FF6A00)!important;color:white!important;border:3px solid #FFE600!important;border-radius:15px!important;font-weight:1000!important;box-shadow:0 5px 0 #053B98!important}[data-testid="stNumberInput"] input{font-size:21px!important;font-weight:1000!important;color:#061A45!important;background:white!important}.stNumberInput label,.stDateInput label,.stSelectbox label,.stRadio label{color:white!important;font-weight:900!important}[data-testid="stPlotlyChart"]{border:3px solid #FF6A00;border-radius:16px;overflow:hidden;background:#061A45}.payday{background:linear-gradient(90deg,#053B98,#087CF2);border:3px solid #FFE600;border-radius:14px;padding:12px;margin:7px 0;font-weight:900}@media(max-width:700px){[data-testid="column"]{min-width:100%!important;width:100%!important;flex:1 1 100%!important}.cards{grid-template-columns:1fr 1fr}.brand{font-size:2.25rem}.value{font-size:1.8rem}}</style>""",unsafe_allow_html=True)
 for k,v in {"active_deposit":10.,"deposit_draft":10.,"focus":"impact","custom_goal":1000.}.items():
  if k not in st.session_state:st.session_state[k]=v
+
+# FAMILY GOAL DASHBOARD — live biweekly savings planner
+import calendar
+from math import ceil
+FAMILY_TARGET=date(2027,3,1)
+FAMILY_START=date(2026,10,20)
+FAMILY_PAYDAY=date(2026,10,23)
+FAMILY_GOAL=5000.0
+
+def family_projection(balance,deposit,split=False):
+    first=float(balance); second=0.; records=[]; total_interest=0.
+    d=FAMILY_START
+    while d<=FAMILY_TARGET:
+        if d>=FAMILY_PAYDAY and (d-FAMILY_PAYDAY).days%14==0:
+            if split:
+                add_first=min(float(deposit),max(1000.-first,0.))
+                first+=add_first;second+=float(deposit)-add_first
+            else:first+=float(deposit)
+        intr1=daily_interest(first,Cfg(d,first,d,14))
+        intr2=daily_interest(second,Cfg(d,second,d,14)) if split else 0.
+        first+=intr1;second+=intr2;total_interest+=intr1+intr2
+        records.append({"date":d,"balance":first+second,"primary":first,"spouse":second,"interest":total_interest})
+        d+=timedelta(days=1)
+    return pd.DataFrame(records)
+
+def family_required(balance,split=False):
+    lo,hi=0.,10000.
+    for _ in range(35):
+        mid=(lo+hi)/2
+        if family_projection(balance,mid,split).iloc[-1]["balance"]>=FAMILY_GOAL:hi=mid
+        else:lo=mid
+    return ceil(hi*100)/100
+
+st.markdown("<div class='section'>🏆 FAMILY MISSION: $5,000 BY MARCH 1, 2027</div>",unsafe_allow_html=True)
+family_balance=st.number_input("💰 ACTUAL SAVINGS BALANCE — update anytime ($)",min_value=0.,value=70.,step=5.,format="%.2f",key="family_balance")
+today=date.today()
+paydates=[FAMILY_PAYDAY+timedelta(days=14*i) for i in range(30) if FAMILY_PAYDAY+timedelta(days=14*i)<=FAMILY_TARGET]
+remaining_paydays=[d for d in paydates if d>=today]
+days_left=max((FAMILY_TARGET-today).days,0)
+st.markdown(f"<div class='cards'><div class='card'><div class='label'>SAVED NOW</div><div class='value'>{money(family_balance)}</div><div class='sub'>{family_balance/FAMILY_GOAL*100:.1f}% of goal</div></div><div class='card'><div class='label'>DAYS LEFT</div><div class='value'>{days_left}</div><div class='sub'>until March 1, 2027</div></div><div class='card'><div class='label'>PAYCHECKS LEFT</div><div class='value'>{len(remaining_paydays)}</div><div class='sub'>next: {remaining_paydays[0].strftime('%b %d') if remaining_paydays else 'none'}</div></div><div class='card'><div class='label'>STILL TO SAVE</div><div class='value'>{money(max(FAMILY_GOAL-family_balance,0))}</div><div class='sub'>family finish line</div></div></div>",unsafe_allow_html=True)
+st.progress(min(family_balance/FAMILY_GOAL,1.))
+required=family_required(family_balance)
+family_deposit=st.selectbox("💵 BIWEEKLY DEPOSIT — choose your paycheck amount",options=sorted(set([50,100,200,300,400,450,475,500,550,600,650,700,750,800,900,1000,round(required,2)])),index=0,key="family_deposit")
+custom_deposit=st.number_input("Or type an exact deposit ($)",min_value=0.,value=float(family_deposit),step=5.,format="%.2f",key=f"family_exact_{family_deposit}")
+family_df=family_projection(family_balance,custom_deposit)
+projected=float(family_df.iloc[-1]["balance"]);shortfall=FAMILY_GOAL-projected
+st.markdown(f"<div class='panel'><div class='yellow'>YOUR MARCH 1 FORECAST</div><div class='big'>{money(projected)}</div>Minimum modeled deposit: <span class='yellow'>{money(required)}/paycheck</span> • Current scenario: {money(custom_deposit)}/paycheck • {'🎉 GOAL REACHED' if shortfall<=0 else money(shortfall)+' short of goal'}. Includes estimated interest.</div>",unsafe_allow_html=True)
+chart=go.Figure()
+chart.add_trace(go.Scatter(x=family_df.date,y=family_df.balance,name="Projected savings",line=dict(color=YELLOW,width=5),fill="tozeroy",fillcolor="rgba(255,230,0,.12)"))
+chart.add_hline(y=FAMILY_GOAL,line_dash="dash",line_color=RED,annotation_text="$5,000 goal")
+style_chart(chart,380);chart.update_yaxes(tickprefix="$");st.plotly_chart(chart,use_container_width=True,config={"displayModeBar":False})
+st.markdown("<div class='section'>📅 PAYCHECK-BY-PAYCHECK ROADMAP</div>",unsafe_allow_html=True)
+st.dataframe(family_df[family_df.date.isin(paydates)][["date","balance","primary"]].rename(columns={"date":"Payday","balance":"Projected total","primary":"Primary account"}),hide_index=True,use_container_width=True)
+with st.expander("💍 TWO 10% ACCOUNTS — YOURS + YOUR WIFE'S"):
+    st.write("Optional scenario only. Assumes your wife independently qualifies for the same 10% APY on her first $1,000, and that deposits can be split. Verify membership, rate terms, eligibility, and account ownership before using this strategy.")
+    split_df=family_projection(family_balance,custom_deposit,True)
+    split_total=float(split_df.iloc[-1]["balance"])
+    st.metric("Projected March 1 with two eligible accounts",money(split_total),delta=money(split_total-projected)+" vs one account")
+    st.write(f"Modeled minimum per paycheck using two accounts: {money(family_required(family_balance,True))}. The 10% rate only applies to the first $1,000 in each eligible account; excess earns the modeled 0.10% tier.")
+st.caption("Forecast assumptions: 10% APY on the first $1,000 per eligible account, 0.10% above, daily effective accrual, fixed rates, and biweekly deposits. Actual credit-union dividend posting and account eligibility may differ. Your balance is editable for planning and is not synced with the bank.")
+
 st.markdown(f"<div class='brand'>HIGH-YIELD <span>SAVINGS</span> PROJECT <small style='font-size:.28em'>v{APP_VERSION}</small></div>",unsafe_allow_html=True)
 a,b=st.columns([1.18,.82],gap="medium")
 with a:st.markdown("<div class='hero'><img src='https://raw.githubusercontent.com/Grzesiak33/High-Yield-Savings-Project/main/assets/savings_hero.png'></div>",unsafe_allow_html=True)
