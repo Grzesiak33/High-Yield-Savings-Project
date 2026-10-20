@@ -5,7 +5,7 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 
-st.set_page_config(page_title="Our $5,000 Family Savings Goal",page_icon="💰",layout="wide")
+st.set_page_config(page_title="Steve & Ashlee’s Savings Project",page_icon="💰",layout="wide")
 GOAL=5000.0
 DEADLINE=date(2027,3,1)
 FIRST=date(2026,10,23)
@@ -47,8 +47,8 @@ def required(balance,today,dual=False):
     return ans
 
 today=date.today()
-st.title("💰 OUR FAMILY SAVINGS MISSION")
-st.caption("Mobile-friendly savings planner • Goal: March 1, 2027")
+st.title("💰 STEVE & ASHLEE’S SAVINGS PROJECT")
+st.caption("Our $5,000 family mission • March 1, 2027 • Every payday counts")
 if "family_balance" not in st.session_state:st.session_state.family_balance=70.
 balance=st.number_input("💵 Actual savings balance — update anytime",min_value=0.,step=5.,format="%.2f",key="family_balance")
 remaining=paydays(today);days=max(0,(DEADLINE-today).days)
@@ -92,4 +92,4 @@ with st.expander("💍 Optional: a second eligible 10% account in my wife's name
     st.caption("Model routes deposits to the first account until it reaches $1,000, then to the second. Both earn 10% APY on the first $1,000 and 0.10% above.")
 st.markdown('<div class="info">📱 Share this website link with your wife. Each phone can view and edit its own scenario. Balances are not yet synchronized between devices, and this site does not connect to your bank.</div>',unsafe_allow_html=True)
 st.caption("Estimates use 10% APY on the first $1,000, 0.10% above, daily interest calculations, and modeled month-end dividend posting. Actual rates, dates, and dividends may differ.")
-st.caption("High-Yield Savings Project v2.2.0")
+st.caption("Steve & Ashlee’s Savings Project v2.3.0")
